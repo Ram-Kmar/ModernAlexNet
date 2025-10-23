@@ -37,8 +37,8 @@ learning_rate = 1e-4
 eval_iters = 20
 n_embd = 256
 n_head = 4
-n_layer = 4
-dropout = 0.2
+n_layer = 8
+dropout = 0.5
 # ------------
 class Head(nn.Module):
     """ one head of self-attention """
@@ -114,7 +114,7 @@ class Block(nn.Module):
         x = x + self.ffwd(self.ln2(x))
         return x
 
-class GPTLanguageModel(nn.Module):
+class GPT(nn.Module):
 
     def __init__(self):
         super().__init__()
@@ -174,7 +174,7 @@ class AlexNet(nn.Module):
             nn.MaxPool2d(kernel_size=3, stride=2),
         )
         self.avgpool = nn.AdaptiveAvgPool2d((6, 6))
-        self.transformer = GPTLanguageModel()
+        self.transformer = GPT()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.features(x)
@@ -291,6 +291,7 @@ def train_one_epoch(
         # Forward pass
         optimizer.zero_grad()
         outputs = model(inputs)
+
         loss = criterion(outputs, labels)
         
         # Backward pass and optimization
