@@ -21,33 +21,19 @@ from torch.utils.data import DataLoader
 from torch.nn import functional as F
 from typing import Tuple
 
-# --- 1. Configuration ---
-
-# Training settings
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
-NUM_CLASSES = 10
-LEARNING_RATE = 1e-4
-WEIGHT_DECAY = 0.0005
-BATCH_SIZE = 128
-NUM_EPOCHS = 4
-
-# Data and Checkpoint paths
-DATA_ROOT = "data"
-CHECKPOINT_PATH = "alexnet_imagenette.pth"
-
-# DataLoader settings
-NUM_WORKERS = os.cpu_count() // 2 if os.cpu_count() else 4
-# 'mps' device does not support pin_memory, so we set it based on the device
-PIN_MEMORY = False if DEVICE.type == 'mps' else True
-
 # -----------hyperparameter for Transformer --------------
 
+device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
 batch_size = 128 # how many independent sequences will we process in parallel?
 block_size = 256 # what is the maximum context length for predictions?
-# max_iters = 200
-# eval_interval = 10
-# learning_rate = 3e-4
-device = 'mps' if torch.mps.is_available() else 'cpu'
+num_classes = 10
+num_epochs = 4
+data_root = "data"
+checkpoint_path = "alexnet_imagenette.pth"
+num_workers = os.cpu_count() // 2 if os.cpu_count() else 4
+pin_memory = False if device.type == 'mps' else True
+weight_decay = 0.0005
+learning_rate = 1e-4
 eval_iters = 20
 n_embd = 256
 n_head = 4
@@ -132,12 +118,9 @@ class GPTLanguageModel(nn.Module):
 
     def __init__(self):
         super().__init__()
-        # each token directly reads off the logits for the next token from a lookup table
-        # self.token_embedding_table = nn.Embedding(vocab_size, n_embd)
-        # self.position_embedding_table = nn.Embedding(block_size, n_embd)
         self.blocks = nn.Sequential(*[Block(n_embd, n_head=n_head) for _ in range(n_layer)])
         self.ln_f = nn.LayerNorm(n_embd) # final layer norm
-        self.lm_head = nn.Linear(9216, NUM_CLASSES)
+        self.lm_head = nn.Linear(9216, num_classes)
 
         # better init, not covered in the original GPT video, but important, will cover in followup video
         self.apply(self._init_weights)
@@ -153,41 +136,12 @@ class GPTLanguageModel(nn.Module):
     def forward(self, idx, targets=None):
         B, T, C = idx.shape
 
-        # idx and targets are both (B,T) tensor of integers
-        # tok_emb = self.token_embedding_table(idx) # (B,T,C)
-        # pos_emb = self.position_embedding_table(torch.arange(T, device=device)) # (T,C)
-        # x = tok_emb + pos_emb # (B,T,C)
         x = self.blocks(idx) # (B,T,C)
         x = self.ln_f(x) # (B,T,C)
         x = torch.flatten(x,1)
         output = self.lm_head(x) # (B,T,vocab_size)
 
-        # if targets is None:
-        #     loss = None
-        # else:
-        #     B, T, C = logits.shape
-        #     logits = logits.view(B*T, C)
-        #     targets = targets.view(B*T)
-        #     loss = F.cross_entropy(logits, targets)
-        #
         return output
-
-    # def generate(self, idx, max_new_tokens):
-    #     # idx is (B, T) array of indices in the current context
-    #     for _ in range(max_new_tokens):
-    #         # crop idx to the last block_size tokens
-    #         idx_cond = idx[:, -block_size:]
-    #         # get the predictions
-    #         logits, loss = self(idx_cond)
-    #         # focus only on the last time step
-    #         logits = logits[:, -1, :] # becomes (B, C)
-    #         # apply softmax to get probabilities
-    #         probs = F.softmax(logits, dim=-1) # (B, C)
-    #         # sample from the distribution
-    #         idx_next = torch.multinomial(probs, num_samples=1) # (B, 1)
-    #         # append sampled index to the running sequence
-    #         idx = torch.cat((idx, idx_next), dim=1) # (B, T+1)
-    #     return idx
 
 # --- 2. Model Definition ---
 
@@ -220,15 +174,6 @@ class AlexNet(nn.Module):
             nn.MaxPool2d(kernel_size=3, stride=2),
         )
         self.avgpool = nn.AdaptiveAvgPool2d((6, 6))
-        # self.classifier = nn.Sequential(
-        #     nn.Dropout(p=0.5),
-        #     nn.Linear(256 * 6 * 6, 4096),
-        #     nn.ReLU(inplace=True),
-        #     nn.Dropout(p=0.5),
-        #     nn.Linear(4096, 4096),
-        #     nn.ReLU(inplace=True),
-        #     nn.Linear(4096, num_classes),
-        # )
         self.transformer = GPTLanguageModel()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -407,24 +352,24 @@ def main():
     num_epochs = args.epochs  # This is our new "total epochs"
 
     print(f"--- AlexNet Training on Imagenette ---")
-    print(f"Using device: {DEVICE}")
-    print(f"Using {NUM_WORKERS} workers and Pin Memory: {PIN_MEMORY}")
+    print(f"Using device: {device}")
+    print(f"Using {num_workers} workers and Pin Memory: {pin_memory}")
 
     # --- 1. Load Data ---
     train_loader, val_loader = get_data_loaders(
-        root=DATA_ROOT,
-        batch_size=BATCH_SIZE,
-        num_workers=NUM_WORKERS,
-        pin_memory=PIN_MEMORY
+        root=data_root,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        pin_memory=pin_memory
     )
 
     # --- 2. Initialize Model, Loss, and Optimizer ---
-    model = AlexNet(num_classes=NUM_CLASSES).to(DEVICE)
+    model = AlexNet(num_classes=num_classes).to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.AdamW(
         model.parameters(), 
-        lr=LEARNING_RATE, 
-        weight_decay=WEIGHT_DECAY
+        lr=learning_rate, 
+        weight_decay=weight_decay
     )
     
     # Print model summary
@@ -437,10 +382,10 @@ def main():
     history = {
         'train_loss': [], 'train_acc': [], 'val_loss': [], 'val_acc': []
     }
-    if os.path.exists(CHECKPOINT_PATH):
+    if os.path.exists(checkpoint_path):
         try:
             start_epoch, _ = load_checkpoint(
-                model, optimizer, CHECKPOINT_PATH, DEVICE
+                model, optimizer, checkpoint_path, device
             )
         except Exception as e:
             print(f"Warning: Could not load checkpoint. Starting fresh. Error: {e}")
@@ -460,12 +405,12 @@ def main():
             
             # Train
             train_loss, train_acc = train_one_epoch(
-                model, train_loader, optimizer, criterion, DEVICE
+                model, train_loader, optimizer, criterion, device
             )
             
             # Validate
             val_loss, val_acc = validate(
-                model, val_loader, criterion, DEVICE
+                model, val_loader, criterion, device
             )
             
             # Save metrics for plotting
@@ -486,7 +431,7 @@ def main():
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
                 save_checkpoint(
-                    model, optimizer, epoch, val_loss, history, CHECKPOINT_PATH
+                    model, optimizer, epoch, val_loss, history, checkpoint_path
                 )
             else:
                 print(f"Validation loss did not improve from {best_val_loss:.4f}.")
@@ -495,7 +440,7 @@ def main():
         print("\n--- Training Finished ---")
         print(f"Total training time: {(total_end_time - total_start_time) / 60:.2f} minutes")
         print(f"Best validation loss: {best_val_loss:.4f}")
-        print(f"Final model and checkpoint saved to {CHECKPOINT_PATH}")
+        print(f"Final model and checkpoint saved to {checkpoint_path}")
 
     # # --- 5. Plot and Save Curves ---
     # # This will now plot the *full* history, even when resuming
