@@ -24,7 +24,7 @@ from typing import Tuple
 # -----------hyperparameter for Transformer --------------
 
 device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
-batch_size = 128 # how many independent sequences will we process in parallel?
+batch_size = 64 # how many independent sequences will we process in parallel?
 block_size = 256 # what is the maximum context length for predictions?
 num_classes = 10
 num_epochs = 4
@@ -36,8 +36,8 @@ weight_decay = 0.0005
 learning_rate = 1e-4
 eval_iters = 20
 n_embd = 256
-n_head = 4
-n_layer = 8
+n_head = 12
+n_layer = 12
 dropout = 0.5
 # ------------
 class Head(nn.Module):
