@@ -36,8 +36,8 @@ weight_decay = 0.0005
 learning_rate = 1e-4
 eval_iters = 20
 n_embd = 256
-n_head = 12
-n_layer = 12
+n_head = 16
+n_layer = 16
 dropout = 0.5
 # ------------
 class Head(nn.Module):
