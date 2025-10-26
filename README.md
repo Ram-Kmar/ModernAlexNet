@@ -1,0 +1,1 @@
+A 15M paramter hybrid vision model combining a classic AlexNet backbone with a 16-layer Transformer block. Updated with modern techinques like BatchNorm and AdamW and trained on imagenette.
